@@ -4,10 +4,10 @@ package cn.footman.chapter2;
  * @author kokio
  * @create 2019-04-30 19:28
  */
-public class ThreadB extends Thread {
-    private HasSelfPrivateNum numRef;
+public class Two11ThreadB extends Thread {
+    private Two11HasSelfPrivateNum numRef;
 
-    public ThreadB(HasSelfPrivateNum numRef) {
+    public Two11ThreadB(Two11HasSelfPrivateNum numRef) {
         this.numRef = numRef;
     }
 

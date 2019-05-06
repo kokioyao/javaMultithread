@@ -4,7 +4,7 @@ package cn.footman.chapter2;
  * @author kokio
  * @create 2019-04-30 19:26
  */
-public class HasSelfPrivateNum {
+public class Two11HasSelfPrivateNum {
     public void addI(String username){
         try {
             int num = 0;
