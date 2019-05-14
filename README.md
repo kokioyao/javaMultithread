@@ -342,7 +342,7 @@ synchronized同步方法和synchronized(this)同步代码块分别有两种作�
 
 变量在内存中工作的过程
 
-![](pic/volatile_in_mem.png)
+![](src/main/resources/pic/volatile_in_mem.png)
 
 1. read和load阶段：从主存复制到到当前线程工作内存；
 2. use和assign阶段：执行代码，改变恭喜那个变量值；
