@@ -352,3 +352,84 @@ synchronized同步方法和synchronized(this)同步代码块分别有两种作�
 
 关键字synchronized可以保证在同一时刻，只有一个线程可以执行某一方法或某一个代码块。它包含连个特征：互斥性和可见性。同步synchronized不经可以解决一个线程看到对象处于不一致的状态，还可以保证进入同步方法或者同步代码块的每个线程，都卡拿到由同一个锁保护之前所有的修改效果
 
+## Chapter3
+
+### 等待/通知机制
+
+关键字synchronized可以将任何一个Object对象作为同步对象来看待，而java为每个Object都实现了wait()和notify()方法。他们必须用在呗synchronized同步的Object的临界区内。通过调用wait()方法可以时处于临界区内的线程进入等待状态，同时解放被同步对象的锁。而notify操作可以换行一个因调用了wait操作而处于阻塞状态中的线程，使其进入就绪状态。被重新唤醒的线程会试图重新获得临界区的控制权，也就是锁，并继续执行临界区内wait之后的代码。如果发出notify操作时没有处于阻塞状态中的线程，那么该命令就会被忽略。
+
+- wait() 方法可以时调用该方法的线程释放共享资源的锁，然后从运行状态中退出没进入等待队列，直到被再次唤醒。
+- notify() 方法可以随机换行等待队列中等待统一共享资源的"一个"线程，并使该线程退出等待队列，进入可运行状态，notify()方法只唤醒"一个"线程。另外需要注意的是：执行notify()之后，当前线程不会马上释放对象锁，呈wait状态的线程也并不能马上获取该对象锁，要等到执行notify()方法的线程将程序执行完，也就是退出synchronized，当前线程才会释放锁。
+- notifyall() 方法可以使所有正在等待队列中等待统一共享资源的"全部"线程从等待状态退出，进入可运行状态。此时，优先级最高的那个线程最先执行，但也有可能是随机执行，要取决于JVM虚拟机的实现。
+
+
+
+#### 多生产者和多消费者会产生假死状态
+
+使用notify唤醒时，在多生产者和多消费者的情况下，唤醒的可能是同类线程，即已经生产了，需要唤醒消费者，而notify唤醒的又是生产者，所以导致最后线程全部进入wait状态，形成假死。所以解决这种问题的方式是将notify改成notifyAll方法
+
+
+
+#### 生产者消费者总结
+
+1. 你可以使用wait和notify函数来实现线程间通信。你可以用它们来实现多线程（>3）之间的通信。
+
+2. 永远在synchronized的函数或对象里使用wait、notify和notifyAll，不然Java虚拟机会生成 IllegalMonitorStateException。
+
+3.  永远在while循环里而不是if语句下使用wait。这样，循环会在线程睡眠前后都检查wait的条件，并在条件实际上并未改变的情况下处理唤醒通知。
+
+4. 永远在多线程间共享的对象（在生产者消费者模型里即缓冲区队列）上使用wait。
+
+5.  倾向用 notifyAll()，而不是 notify()。
+
+
+
+#### join()方法
+
+方法join的作用是使所属的线程对象x正常执行run()方法中的任务，而使当前线程z进行无限期的阻塞，等待线程x销毁后再继续执行线程z后面的代码。
+
+方法join具有使线程排队的作用，有些类似同步的运行效果。join和synchronized的却别使：join在内部使用wait方法进行等待，而synchronized关键字使用的是"对象监视器"原理作为同步。
+
+
+
+#### join方法原理
+
+join方法源码
+
+```java
+
+ public final synchronized void join(long millis)
+    throws InterruptedException {
+        long base = System.currentTimeMillis();
+        long now = 0;
+
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+
+        if (millis == 0) {
+            while (isAlive()) {
+                wait(0);
+            }
+        } else {
+            while (isAlive()) {
+                long delay = millis - now;
+                if (delay <= 0) {
+                    break;
+                }
+                wait(delay);
+                now = System.currentTimeMillis() - base;
+            }
+        }
+    }
+```
+
+join() 是一个synchronized方法， 里面调用了wait()，这个过程的目的是让持有这个同步锁的线程进入等待，那么谁持有了这个同步锁呢？答案是主线程，因为主线程调用了threadA.join()方法，相当于在threadA.join()代码这块写了一个同步代码块，main线程会获得线程对象threadA的锁，谁去执行了这段代码呢，是主线程，所以主线程被wait()了。然后在子线程threadA执行完毕之后，JVM会调用lock.notify_all(thread);唤醒持有threadA这个对象锁的线程，也就是主线程，会继续执行。
+
+
+
+#### threadlocal
+
+ThreadLocal可以使每一个线程都拥有自己的共享变量
+
+InheritableThreadLocal 可以使子线程获取到父线程的值。
