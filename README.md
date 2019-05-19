@@ -433,3 +433,370 @@ join() 是一个synchronized方法， 里面调用了wait()，这个过程的目
 ThreadLocal可以使每一个线程都拥有自己的共享变量
 
 InheritableThreadLocal 可以使子线程获取到父线程的值。
+
+## chapter4
+
+在JDK1.5中新增加了ReentrantLock类，可以和synchronized达到相同的效果，还扩展了其他功能（嗅探锁定，多路分支通知），更加灵活了。
+
+### 等待/通知模式
+
+Object类中的wait()方法相当于Condition类中的await()方法。
+
+Object类中的wait(long timeout)方法相当于Condition类中的await(long time，TimeUnit unit)方法。
+
+Object类中的notify()方法相当于Condition类中的signal()方法。
+
+Object类中的notifyAll()方法相当于Condition类中的signalAll()方法。
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-17 19:33
+ */
+public class Four14MyService {
+    private Lock lock = new ReentrantLock();
+    public Condition condition = lock.newCondition();
+
+    public void await() {
+        try {
+            lock.lock();
+            System.out.println(" await 的时间为 " + System.currentTimeMillis());
+            condition.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void signal() {
+        try {
+            lock.lock();
+            System.out.println("signal的时间为 " + System.currentTimeMillis());
+            condition.signal();
+        } finally {
+            lock.unlock();
+        }
+
+    }
+}
+
+
+
+/**
+ * @author kokio
+ * @create 2019-05-17 19:37
+ */
+public class Four14ThreadA extends Thread {
+    private Four14MyService service;
+
+    public Four14ThreadA(Four14MyService service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        service.await();
+    }
+}
+
+
+public class Four14Run {
+    public static void main(String[] args) {
+        try {
+            Four14MyService service = new Four14MyService();
+
+            Four14ThreadA threadA = new Four14ThreadA(service);
+            threadA.start();
+
+            Thread.sleep(3000);
+            service.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+结果
+
+```markdown
+ await 的时间为 1558093211859
+signal的时间为 1558093214861
+```
+
+如果想要唤醒部分线程，就可以使用多个Condition对象，来进行完成。
+
+### 公平锁和非公平锁
+
+```markdown
+	lock = new ReentrantLock(isFair)
+  
+  这里的isFair代表是否为公平锁的参数，如果true则为公平锁，那么就是先start的线程，先获得锁，如果是false，那么并不代表先启动的线程先获得锁。
+  
+```
+
+### lock的一些方法
+
+这些感觉不是很有必要，眼熟一下，API中都有。
+
+#### getHoldCount()
+
+查询当前线程保持此锁定的个数，也就是调用lock()方法的次数。
+
+#### getQueueLength()
+
+返回正等待获取此锁定的线程估计数，比如有5个线程，1个线程首先执行sleep（这里书中错了，他写的是await方法，这个方法会释放锁,最终导致getQueueLength()方法获得的线程数为0），那么在调用getQueueLength()方法后返回的是4，说明有4个线程在同时等待lock的释放。
+
+```java
+//使用await的代码
+public class Four110Myservice {
+    public ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void serviceMethod1(){
+        try {
+            lock.lock();
+            System.out.println("ThreadName= " + Thread.currentThread().getName() + "进入方法");
+            condition.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+
+    }
+
+}
+```
+
+结果
+
+```markdown
+ThreadName= Thread-0进入方法
+ThreadName= Thread-2进入方法
+ThreadName= Thread-3进入方法
+ThreadName= Thread-4进入方法
+ThreadName= Thread-1进入方法
+ThreadName= Thread-6进入方法
+ThreadName= Thread-5进入方法
+ThreadName= Thread-7进入方法
+ThreadName= Thread-8进入方法
+ThreadName= Thread-9进入方法
+有线程数0正在等待
+```
+
+使用sleep方法的代码
+
+```java
+public class Four110Myservice {
+    public ReentrantLock lock = new ReentrantLock();
+//    private Condition condition = lock.newCondition();
+    public void serviceMethod1(){
+        try {
+            lock.lock();
+            System.out.println("ThreadName= " + Thread.currentThread().getName() + "进入方法");
+//            condition.await();
+            Thread.sleep(Integer.MAX_VALUE);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+
+    }
+
+}
+
+```
+
+结果
+
+```markdown
+ThreadName= Thread-0进入方法
+有线程数9正在等待
+```
+
+
+
+#### getWaitQueueLength(Condition condition)
+
+此方法的作用是返回等待与此锁相关的给定条件Confition的线程估计数，比如有5个线程，每个线程都执行了同一个condition对象的await()方法，则调用getWaitQueueLength(Condition condition)方法时，返回的是5
+
+
+
+#### hasQueuedThread()、hasQueuedThreads()
+
+方法boolean hasQueuedThread(Thread thread)的作用是查询制定的线程是否正在等待获取此锁。
+
+方法boolean hasQueuedThreads()的作用是查询是否有线程正在等待获取此锁。
+
+#### hasWaiter(Condition condition)
+
+此方法的作用是查询是否有线程正在等待与此锁有关的condition条件，可以和getWaitQueueLength方法一起用，获取准确的线程数
+
+
+
+#### isFair()
+
+此方法是判断是否为公平锁，在创建lock时,可以传入参数，选择是否创建公平锁，而默认情况下，ReentrantLock类使用的是非公平锁。
+
+#### isHeldByCurrentThread()
+
+此方法是查询当前线程是否保持此锁。
+
+#### isLocked()
+
+此方法是查询此锁是否由任意线程保持。
+
+
+
+#### lockInterruptibly()
+
+此方法的作用是：如果当前线程未被中断，则获取锁，如果已经被中断则出现异常。
+
+#### tryLock()
+
+此方法的作用是，调用时如果锁未被另一个线程获得的情况下，才获得该锁。
+
+#### tryLock(long tiemout,TimeUnit unit)
+
+此方法的作用：如果锁在给定等待时间内没有被另一个线程保持，而且线程未被中断，那么该线程就会获得锁。
+
+#### awaitUninterruptibly()
+
+此方法与await相似，不过此方法不会在等待过程中响应中断，如果当前线程的中断状态在进入此方法时设置，或者等待时为[interrupted](http://www.matools.com/file/manual/jdk_api_1.8_google/java/lang/Thread.html#interrupt--) ，则会继续等待直到发信号。 当它最终从该方法返回时，它的中断状态将仍然被设置。
+
+#### awaitUntil()
+
+使当前线程等待直到发出信号或中断，或者指定的最后期限过去。
+
+### 使用Condition实现顺序执行
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-19 17:56
+ */
+public class Four116Run {
+    public volatile static int nextPrintWho = 1;
+
+    private static ReentrantLock lock = new ReentrantLock();
+    private final static Condition conditionA = lock.newCondition();
+    private final static Condition conditionB = lock.newCondition();
+    private final static Condition conditionC = lock.newCondition();
+
+    public static void main(String[] args) {
+        Thread threadA = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    lock.lock();
+                    while (nextPrintWho != 1) {
+                        conditionA.await();
+                    }
+                    for (int i = 0; i < 3; i++) {
+                        System.out.println("threada " + (i + 1));
+                    }
+                    nextPrintWho = 2;
+                    //B全部唤醒
+                    conditionB.signalAll();
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        };
+
+        Thread threadB = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    lock.lock();
+                    while (nextPrintWho != 2) {
+                        conditionA.await();
+                    }
+                    for (int i = 0; i < 3; i++) {
+                        System.out.println("threadb " + (i + 1));
+                    }
+                    nextPrintWho = 3;
+                    //B全部唤醒
+                    conditionC.signalAll();
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        };
+
+        Thread threadC = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    lock.lock();
+                    while (nextPrintWho != 3) {
+                        conditionA.await();
+                    }
+                    for (int i = 0; i < 3; i++) {
+                        System.out.println("threadc " + (i + 1));
+                    }
+                    nextPrintWho = 1;
+                    //B全部唤醒
+                    conditionA.signalAll();
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        };
+
+        Thread[] aArrays = new Thread[5];
+        Thread[] bArrays = new Thread[5];
+        Thread[] cArrays = new Thread[5];
+
+        for(int i = 0; i< 5; i++){
+            aArrays[i] = new Thread(threadA);
+            bArrays[i] = new Thread(threadB);
+            cArrays[i] = new Thread(threadC);
+
+            aArrays[i].start();
+            bArrays[i].start();
+            cArrays[i].start();
+
+        }
+    }
+}
+
+```
+
+结果
+
+```markdown
+threada 1
+threada 2
+threada 3
+threadb 1
+threadb 2
+threadb 3
+threadc 1
+threadc 2
+threadc 3
+.
+.
+.
+```
+
+
+
+### ReentrantReadWriteLock类
+
+类ReentrantLock具有完全互斥排他的效果，即同一时间只有一个线程在执行ReentrantLock.lock()方法后面的任务，虽然线程安全，但效率低下。
+
+ReentrantReadWriteLock类 有两个锁，一个是读操作相关的锁，也称共享锁，一个是写操作相关的锁，也称排他锁；多个读锁止键不互斥，读锁与写锁呼哧，写锁和写锁互斥。在没有线程Thread进行写入操作时，进行读取操作的托哥Thread都可以获取读锁，而进行写入操作的Thread只有在获取写锁后才能进行写入操作。即多个Thread可以同时进行读取操作，但是同一时刻只允许一个Thread进行写入操作。
+
+"读写"、"写读"、"写写"都是互斥的，而"读读"是异步的，非互斥的。
