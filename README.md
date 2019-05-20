@@ -800,3 +800,263 @@ threadc 3
 ReentrantReadWriteLock类 有两个锁，一个是读操作相关的锁，也称共享锁，一个是写操作相关的锁，也称排他锁；多个读锁止键不互斥，读锁与写锁呼哧，写锁和写锁互斥。在没有线程Thread进行写入操作时，进行读取操作的托哥Thread都可以获取读锁，而进行写入操作的Thread只有在获取写锁后才能进行写入操作。即多个Thread可以同时进行读取操作，但是同一时刻只允许一个Thread进行写入操作。
 
 "读写"、"写读"、"写写"都是互斥的，而"读读"是异步的，非互斥的。
+
+
+
+## chapter5
+
+### 
+
+### schedule(TimerTask task，Date time)
+
+该方法的作用是在制定的日期执行一次某一任务
+
+1. 当执行任务的时间晚于当前时间——在未来执行的效果
+
+2. 当执行任务的时间早于当前时间——即刻执行
+
+3. timertask是以队列的方式一个一个被顺序性地执行，所以执行的时间可能和预期的时间不一致，因为前面的任务有可能消耗的恶时间较长，则后面的任务运行的时间也被延后。
+
+### schedule（TimerTask task,Date firstTime,long period）
+
+该方法的作用是在指定的日期之后按指定的间隔周期，无限循环地执行某一任务。
+
+1. 当计划时间晚于当前时间——在未来执行
+
+2. 当计划时间早于当前时间——即刻执行
+
+3. 当任务执行时间被延时，则按照延时的时间间隔来执行
+
+4. TimerTask类的cancel()方法
+
+timerTask()类中的cancel()方法的作用是将自身从任务队列中清除，其他任务不受影响。
+
+5. Timer类的cancel()方法
+
+和timerTask()类中的cancel()方法清除自身不同，Timer类中国呢的cancel()方法作用是将任务队列中全部的任务进行清空。
+
+6. 注意：timer类中的cancel()方法又是并不一定会停止计划任务，而是正常执行。原因是Timer类中的cancel()方法有时没有争抢到queue锁，则让TimerTask类中的任务正常执行。
+
+### schedule(TimerTask task,long delay)
+
+该方法的作用是以执行schedule(TimerTask task,long delay)方法当前的时间为参考时间，在此时间基础上延迟指定的毫秒数后执行一次TimerTask任务
+
+### schedule(TimerTask task,long delay,long period)
+
+以当前时间为参考时间，延迟指定的毫秒数，再以指定的间隔无限次执行某一任务。
+
+### scheduleAtFixedRate(TimerTask task,Date firstTime,long period)
+
+schedule方法和scheduleAtFixedRate方法都会按顺序执行，所以不用考虑非线程安全的情况，两者的区别在于有没有追赶特性。（计划执行的时间早于现在时间，那么schedule方法就不会讲过去的一段时间所对应的任务执行了，而scheduleAtFixedRate则会将过去一段时间的任务补充进来执行）
+
+不追赶
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-20 13:38
+ */
+public class Five159Test {
+    static class MyTask extends TimerTask{
+
+        @Override
+        public void run() {
+            System.out.println("begin time " + new Date());
+            System.out.println("  end time " + new Date());
+
+        }
+    }
+
+    public static void main(String[] args) {
+        MyTask myTask = new MyTask();
+        System.out.println("现在执行时间：" + new Date());
+        Calendar instance = Calendar.getInstance();
+        instance.set(Calendar.SECOND,instance.get(Calendar.SECOND) - 20);
+        Date time = instance.getTime();
+        System.out.println("计划执行时间" + time);
+        Timer timer = new Timer();
+      //不追赶
+        timer.schedule(myTask,time,2000);
+      //追赶
+      	//timer.scheduleAtFixedRate(myTask,time,2000);
+    }
+}
+
+```
+
+```markdo
+现在执行时间：Mon May 20 13:41:27 CST 2019
+计划执行时间Mon May 20 13:41:07 CST 2019
+begin time Mon May 20 13:41:27 CST 2019
+  end time Mon May 20 13:41:27 CST 2019
+begin time Mon May 20 13:41:29 CST 2019
+  end time Mon May 20 13:41:29 CST 2019
+begin time Mon May 20 13:41:31 CST 2019
+  end time Mon May 20 13:41:31 CST 2019
+begin time Mon May 20 13:41:33 CST 2019
+  end time Mon May 20 13:41:33 CST 2019
+```
+
+追赶
+
+```markdown
+现在执行时间：Mon May 20 13:43:09 CST 2019
+计划执行时间Mon May 20 13:42:49 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:09 CST 2019
+  end time Mon May 20 13:43:09 CST 2019
+begin time Mon May 20 13:43:11 CST 2019
+  end time Mon May 20 13:43:11 CST 2019
+```
+
+
+
+## chapter6
+
+单例模式
+
+### 饿汉模式
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-20 13:53
+ */
+public class Six1MyObject {
+    //立即加在方式 饿汉模式
+    private static Six1MyObject myObject = new Six1MyObject();
+
+    private Six1MyObject(){
+
+    }
+
+    public static Six1MyObject getInstance(){
+        //此版本是立即加在
+        //不能有其他实例变量
+        //getInstance方法没有同步，可能会出现非线程安全问题
+        return myObject;
+    }
+}
+
+```
+
+### 懒汉模式
+
+```JAVA
+/**
+ * @author kokio
+ * @create 2019-05-20 13:57
+ */
+public class Six2MyObject {
+    private static Six2MyObject myObject;
+    
+    private Six2MyObject(){
+        
+    }
+    
+    public synchronized static Six2MyObject getInstance(){
+        if(myObject == null){
+            myObject = new Six2MyObject();
+        }
+        return myObject;
+    }
+}
+
+```
+
+使用synchronized，效率过低
+
+### DCL
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-20 14:09
+ */
+public class Six24MyObject {
+    private volatile static Six24MyObject myObject;
+
+    private Six24MyObject() {
+    }
+
+    public static Six24MyObject getInstance(){
+        if(myObject == null){
+            synchronized (Six24MyObject.class){
+                if(myObject == null){
+                    myObject = new Six24MyObject();
+                }
+            }
+        }
+        return myObject;
+    }
+}
+```
+
+### 静态内部类
+
+```java
+/**
+ * @author kokio
+ * @create 2019-05-20 14:18
+ */
+public class Six3MyObject {
+    private static class MyObjectHandler{
+        private static Six3MyObject myObject = new Six3MyObject();
+    }
+    private Six3MyObject() {
+    }
+
+    public static Six3MyObject getInstance(){
+        return MyObjectHandler.myObject;
+    }
+}
+
+```
+
+### 静态代码块
+
+1. 静态代码块中的代码在使用类的时候就已经执行了,它是**随着类的加载而执行，只执行一次，并优先于主函数**。具体说，**静态代码块是由类调用**的。类调用时，先执行静态代码块，然后才执行主函数的。
+2. **静态代码块其实就是给类初始化的，而构造代码块是给对象初始化的**。
+3. 静态代码块中的变量是局部变量，与普通函数中的局部变量性质没有区别。
+4. 一个类中可以有多个静态代码块
+
+```JAVA
+/**
+ * @author kokio
+ * @create 2019-05-20 14:22
+ */
+public class Six5MyObject {
+    private static Six5MyObject myObject;
+
+    public Six5MyObject() {
+    }
+    
+    static {
+        myObject = new Six5MyObject();
+    }
+    
+    public static Six5MyObject getInstance(){
+        return myObject;
+    }
+}
+```
+
